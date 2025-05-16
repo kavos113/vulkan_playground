@@ -9,6 +9,8 @@ add_executable(refactor
         Application.h
         debugUtils.h
         utils.h
+        DebugManager.cpp
+        DebugManager.h
 )
 target_include_directories(refactor PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/include)
 target_include_directories(refactor PRIVATE $ENV{LIBRARY_DIR}/glm-1.0.1-light)

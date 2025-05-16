@@ -6,6 +6,8 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 
+#include "DebugManager.h"
+
 
 class Application
 {
@@ -43,45 +45,26 @@ private:
     void mainLoop();
     void cleanup();
     void createInstance();
-    bool checkValidationLayerSupport();
-
     std::vector<const char *> getRequiredExtensions();
-
-    void setupDebugMessenger();
-    void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
     void createSurface();
-
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
-
     void pickPhysicalDevice();
-
     int rateDeviceSuitability(VkPhysicalDevice device);
-
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
-
     void createLogicalDevice();
-
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
-
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
-
     void createSwapChain();
     void createImageView();
     void createRenderPass();
     void createPipeline();
-
     VkShaderModule createShaderModule(const std::vector<char> &code);
-
     void createFramebuffers();
     void createCommandPool();
     void createCommandBuffer();
-
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
-
     void createSyncObjects();
     void drawFrame();
     void recreateSwapChain();
@@ -100,8 +83,9 @@ private:
 
     uint32_t currentFrame = 0;
 
+    DebugManager debugManager;
+
     VkInstance instance = VK_NULL_HANDLE;
-    VkDebugUtilsMessengerEXT debugMessenger = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
     VkDevice device = VK_NULL_HANDLE;
     VkQueue graphicsQueue = VK_NULL_HANDLE;
@@ -121,10 +105,6 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
-
-    const std::vector<const char*> validationLayers = {
-        "VK_LAYER_KHRONOS_validation",
-    };
 
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
