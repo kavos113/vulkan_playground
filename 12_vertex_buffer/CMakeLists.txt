@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.28)
-project(refactor)
+project(vertex_buffer)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(refactor
+add_executable(vertex_buffer
         main.cpp
         Application.cpp
         Application.h
@@ -12,12 +12,23 @@ add_executable(refactor
         DebugManager.cpp
         DebugManager.h
 )
-target_include_directories(refactor PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/include)
-target_include_directories(refactor PRIVATE $ENV{LIBRARY_DIR}/glm-1.0.1-light)
-target_include_directories(refactor PRIVATE $ENV{VULKAN_SDK}/Include)
-target_link_libraries(refactor PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/lib-vc2022/glfw3.lib)
-target_link_libraries(refactor PRIVATE $ENV{VULKAN_SDK}/Lib/vulkan-1.lib)
-message($ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/include)
+target_include_directories(vertex_buffer PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/include)
+target_include_directories(vertex_buffer PRIVATE $ENV{LIBRARY_DIR}/glm-1.0.1-light)
+target_include_directories(vertex_buffer PRIVATE $ENV{VULKAN_SDK}/Include)
+target_link_libraries(vertex_buffer PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/lib-vc2022/glfw3.lib)
+target_link_libraries(vertex_buffer PRIVATE $ENV{VULKAN_SDK}/Lib/vulkan-1.lib)
 
-file(COPY shaders/frag.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
-file(COPY shaders/vert.spv DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+add_custom_command(
+        TARGET vertex_buffer
+        PRE_BUILD
+        COMMAND $ENV{VULKAN_SDK}/Bin/glslc.exe ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shader.vert -o ${CMAKE_CURRENT_SOURCE_DIR}/shaders/vert.spv
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/shaders/vert.spv ${CMAKE_CURRENT_BINARY_DIR}/vert.spv
+        COMMENT "Compiling vertex shader"
+)
+add_custom_command(
+        TARGET vertex_buffer
+        PRE_BUILD
+        COMMAND $ENV{VULKAN_SDK}/Bin/glslc.exe ${CMAKE_CURRENT_SOURCE_DIR}/shaders/shader.frag -o ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frag.spv
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/shaders/frag.spv ${CMAKE_CURRENT_BINARY_DIR}/frag.spv
+        COMMENT "Compiling fragment shader"
+)
