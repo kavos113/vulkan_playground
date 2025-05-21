@@ -2,9 +2,12 @@
 #define REFACTOR_APPLICATION_H
 
 #define GLFW_INCLUDE_VULKAN
+#include <GLFW/glfw3.h>
+#include <glm/glm.hpp>
+
+#include <array>
 #include <optional>
 #include <vector>
-#include <GLFW/glfw3.h>
 
 #include "DebugManager.h"
 
@@ -26,7 +29,7 @@ private:
         std::optional<uint32_t> graphicsFamily;
         std::optional<uint32_t> presentFamily;
 
-        bool isComplete()
+        [[nodiscard]] bool isComplete() const
         {
             return graphicsFamily.has_value() && presentFamily.has_value();
         }
@@ -39,6 +42,42 @@ private:
         std::vector<VkPresentModeKHR> presentModes;
     };
 
+    struct Vertex
+    {
+        glm::vec2 pos;
+        glm::vec3 color;
+
+        static VkVertexInputBindingDescription getBindingDescription()
+        {
+            VkVertexInputBindingDescription bindingDescription{};
+
+            bindingDescription.binding = 0;
+            bindingDescription.stride = sizeof(Vertex);
+            bindingDescription.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+            return bindingDescription;
+        }
+
+        static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions()
+        {
+            std::array<VkVertexInputAttributeDescription, 2> attributeDescriptions{};
+
+            attributeDescriptions[0] = {
+                .location = 0,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32_SFLOAT,
+                .offset = offsetof(Vertex, pos),
+            };
+            attributeDescriptions[1] = {
+                .location = 1,
+                .binding = 0,
+                .format = VK_FORMAT_R32G32B32_SFLOAT,
+                .offset = offsetof(Vertex, color),
+            };
+
+            return attributeDescriptions;
+        }
+    };
 
     void initWindow();
     void initVulkan();
@@ -69,6 +108,8 @@ private:
     void drawFrame();
     void recreateSwapChain();
     void cleanupSwapChain();
+    void createVertexBuffer();
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     {
@@ -105,6 +146,8 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
+    VkBuffer vertexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
 
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -118,6 +161,12 @@ private:
 
     const int MAX_FRAMES_IN_FLIGHT = 2;
     bool framebufferResized = false;
+
+    const std::vector<Vertex> vertices = {
+        {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+    };
 };
 
 
