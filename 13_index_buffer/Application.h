@@ -112,6 +112,7 @@ private:
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void createIndexBuffer();
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     {
@@ -150,6 +151,8 @@ private:
     std::vector<VkFence> inFlightFences;
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
+    VkBuffer indexBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
 
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -165,9 +168,14 @@ private:
     bool framebufferResized = false;
 
     const std::vector<Vertex> vertices = {
-        {{0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}},
-        {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}
+        {{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
+        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}
+    };
+
+    const std::vector<uint16_t> indices = {
+        0, 1, 2, 2, 3, 0
     };
 };
 

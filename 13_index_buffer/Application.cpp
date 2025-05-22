@@ -40,6 +40,7 @@ void Application::initVulkan()
     createFramebuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffer();
     createSyncObjects();
 }
@@ -58,6 +59,9 @@ void Application::mainLoop()
 void Application::cleanup()
 {
     cleanupSwapChain();
+
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    vkFreeMemory(device, indexBufferMemory, nullptr);
 
     vkDestroyBuffer(device, vertexBuffer, nullptr);
     vkFreeMemory(device, vertexBufferMemory, nullptr);
@@ -786,6 +790,8 @@ void Application::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
     VkDeviceSize offsets[] = {0};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
 
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+
     VkViewport viewport = {
         .x = 0.0f,
         .y = 0.0f,
@@ -802,7 +808,7 @@ void Application::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
     };
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    vkCmdDraw(commandBuffer, vertices.size(), 1, 0, 0);
+    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
 
@@ -1080,4 +1086,39 @@ void Application::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSiz
     }
 
     vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
+}
+
+void Application::createIndexBuffer()
+{
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+
+    VkBuffer stagingBuffer;
+    VkDeviceMemory stagingBufferMemory;
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        stagingBuffer,
+        stagingBufferMemory
+    );
+
+    void* data;
+    if (vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data) != VK_SUCCESS)
+    {
+        throw std::runtime_error("failed to map memory");
+    }
+    memcpy(data, indices.data(), bufferSize);
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(
+        bufferSize,
+        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+        indexBuffer,
+        indexBufferMemory
+    );
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
