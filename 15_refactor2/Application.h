@@ -10,6 +10,8 @@
 #include <vector>
 
 #include "DebugManager.h"
+#include "QueueFamilyIndices.h"
+#include "Swapchain.h"
 
 
 class Application
@@ -24,23 +26,6 @@ public:
     }
 
 private:
-    struct QueueFamilyIndices
-    {
-        std::optional<uint32_t> graphicsFamily;
-        std::optional<uint32_t> presentFamily;
-
-        [[nodiscard]] bool isComplete() const
-        {
-            return graphicsFamily.has_value() && presentFamily.has_value();
-        }
-    };
-
-    struct SwapChainSupportDetails
-    {
-        VkSurfaceCapabilitiesKHR capabilities{};
-        std::vector<VkSurfaceFormatKHR> formats;
-        std::vector<VkPresentModeKHR> presentModes;
-    };
 
     struct Vertex
     {
@@ -93,28 +78,18 @@ private:
     void createInstance();
     std::vector<const char *> getRequiredExtensions();
     void createSurface();
-    SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice device);
-    VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
     void pickPhysicalDevice();
     int rateDeviceSuitability(VkPhysicalDevice device);
     bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-    QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device);
     void createLogicalDevice();
-    VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
-    void createSwapChain();
-    void createImageView();
     void createRenderPass();
     void createPipeline();
     VkShaderModule createShaderModule(const std::vector<char> &code);
-    void createFramebuffers();
     void createCommandPool();
     void createCommandBuffer();
     void recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex);
     void createSyncObjects();
     void drawFrame();
-    void recreateSwapChain();
-    void cleanupSwapChain();
     void createVertexBuffer();
     uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
@@ -134,12 +109,10 @@ private:
 
     GLFWwindow* window = nullptr;
 
-    const int WIDTH = 800;
-    const int HEIGHT = 600;
-
     uint32_t currentFrame = 0;
 
     DebugManager debugManager;
+    Swapchain swapChain;
 
     VkInstance instance = VK_NULL_HANDLE;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
@@ -147,18 +120,11 @@ private:
     VkQueue graphicsQueue = VK_NULL_HANDLE;
     VkSurfaceKHR surface = VK_NULL_HANDLE;
     VkQueue presentQueue = VK_NULL_HANDLE;
-    VkSwapchainKHR swapChain = VK_NULL_HANDLE;
-    std::vector<VkImage> swapChainImages;
-    std::vector<VkImageView> swapChainImageViews;
-    VkFormat swapChainImageFormat = VK_FORMAT_UNDEFINED;
-    VkExtent2D swapChainExtent = {};
     VkRenderPass renderPass = VK_NULL_HANDLE;
     VkPipelineLayout pipelineLayout = VK_NULL_HANDLE;
     VkPipeline graphicsPipeline = VK_NULL_HANDLE;
-    std::vector<VkFramebuffer> swapChainFramebuffers;
     VkCommandPool commandPool = VK_NULL_HANDLE;
     std::vector<VkCommandBuffer> commandBuffers;
-    std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
@@ -183,7 +149,6 @@ private:
     const bool enableValidationLayers = true;
 #endif
 
-    const int MAX_FRAMES_IN_FLIGHT = 2;
     bool framebufferResized = false;
 
     const std::vector<Vertex> vertices = {

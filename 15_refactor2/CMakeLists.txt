@@ -11,6 +11,10 @@ add_executable(refactor2
         utils.h
         DebugManager.cpp
         DebugManager.h
+        Swapchain.cpp
+        Swapchain.h
+        QueueFamilyIndices.h
+        settings.h
 )
 target_include_directories(refactor2 PRIVATE $ENV{LIBRARY_DIR}/glfw-3.4.bin.WIN64/include)
 target_include_directories(refactor2 PRIVATE $ENV{LIBRARY_DIR}/glm-1.0.1-light)
