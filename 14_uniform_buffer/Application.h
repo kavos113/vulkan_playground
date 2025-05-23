@@ -79,6 +79,13 @@ private:
         }
     };
 
+    struct UniformBufferObject
+    {
+        glm::mat4 model;
+        glm::mat4 view;
+        glm::mat4 proj;
+    };
+
     void initWindow();
     void initVulkan();
     void mainLoop();
@@ -113,6 +120,11 @@ private:
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer &buffer, VkDeviceMemory &bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     void createIndexBuffer();
+    void createDescriptorSetLayout();
+    void createUniformBuffer();
+    void updateUniformBuffer(uint32_t currentImageIndex);
+    void createDescriptorPool();
+    void createDescriptorSets();
 
     static void framebufferResizeCallback(GLFWwindow* window, int width, int height)
     {
@@ -153,6 +165,13 @@ private:
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
     VkBuffer indexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
+    VkDescriptorSetLayout descriptorSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+    std::vector<VkDescriptorSet> descriptorSets;
+
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    std::vector<void*> uniformBuffersMapped;
 
     const std::vector<const char*> deviceExtensions = {
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
