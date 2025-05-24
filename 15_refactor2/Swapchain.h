@@ -5,9 +5,6 @@
 #include <vector>
 #include <GLFW/glfw3.h>
 
-#include "QueueFamilyIndices.h"
-
-
 class Swapchain
 {
 public:
@@ -24,42 +21,30 @@ public:
     void create(
         VkPhysicalDevice physicalDevice,
         VkDevice device,
-        VkSurfaceKHR surface,
-        QueueFamilyIndices indices
+        VkSurfaceKHR surface
     );
-    void createFramebuffers(VkDevice device, VkRenderPass renderPass);
-    void cleanup(VkDevice device);
-    void cleanupSemaphore(VkDevice device);
-    void recreate(
-        VkPhysicalDevice physicalDevice,
-        VkDevice device,
-        VkSurfaceKHR surface,
-        VkRenderPass renderPass,
-        QueueFamilyIndices indices
-    );
+    void createFramebuffers(VkRenderPass renderPass);
+    void cleanup() const;
+    void cleanupSemaphore() const;
+    void recreate(VkRenderPass renderPass);
 
-    uint32_t currentImage(VkDevice device, VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkRenderPass renderPass, uint32_t currentFrame);
+    uint32_t currentImage(VkRenderPass renderPass, uint32_t currentFrame);
 
-    VkFormat format() const { return swapChainImageFormat; }
-    VkExtent2D extent() const { return swapChainExtent; }
-    VkFramebuffer framebuffer(uint32_t index) const { return swapChainFramebuffers[index]; }
-    VkSemaphore imageAvailableSemaphore(uint32_t index) const { return imageAvailableSemaphores[index]; }
-    VkSwapchainKHR handle() const { return swapChain; }
+    [[nodiscard]] VkFormat format() const { return swapChainImageFormat; }
+    [[nodiscard]] VkExtent2D extent() const { return swapChainExtent; }
+    [[nodiscard]] VkFramebuffer framebuffer(uint32_t index) const { return swapChainFramebuffers[index]; }
+    [[nodiscard]] VkSemaphore imageAvailableSemaphore(uint32_t index) const { return imageAvailableSemaphores[index]; }
+    [[nodiscard]] VkSwapchainKHR handle() const { return swapChain; }
 
 private:
 
-    void createSwapChain(
-        VkPhysicalDevice physicalDevice,
-        VkDevice device,
-        VkSurfaceKHR surface,
-        QueueFamilyIndices indices
-    );
-    void createImageView(VkDevice device);
-    void createSemaphore(VkDevice device, uint32_t size);
+    void createSwapChain();
+    void createImageView();
+    void createSemaphore(uint32_t size);
 
     VkSurfaceFormatKHR chooseSwapSurfaceFormat(const std::vector<VkSurfaceFormatKHR> &availableFormats);
     VkPresentModeKHR chooseSwapPresentMode(const std::vector<VkPresentModeKHR> &availablePresentModes);
-    VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
+    [[nodiscard]] VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const;
 
     GLFWwindow* window = nullptr;
 
@@ -71,8 +56,10 @@ private:
     std::vector<VkFramebuffer> swapChainFramebuffers;
 
     std::vector<VkSemaphore> imageAvailableSemaphores;
+
+    VkDevice m_device = VK_NULL_HANDLE;
+    VkPhysicalDevice m_physicalDevice = VK_NULL_HANDLE;
+    VkSurfaceKHR m_surface = VK_NULL_HANDLE;
 };
-
-
 
 #endif //REFACTOR2_SWAPCHAIN_H

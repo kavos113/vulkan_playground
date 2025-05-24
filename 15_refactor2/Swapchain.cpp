@@ -4,50 +4,48 @@
 #include <iostream>
 #include <stdexcept>
 
+#include "QueueFamilyIndices.h"
 #include "settings.h"
 
 void Swapchain::create(
     VkPhysicalDevice physicalDevice,
     VkDevice device,
-    VkSurfaceKHR surface,
-    QueueFamilyIndices indices
+    VkSurfaceKHR surface
 )
 {
-    createSwapChain(physicalDevice, device, surface, indices);
-    createImageView(device);
-    createSemaphore(device, MAX_FRAMES_IN_FLIGHT);
+    m_device = device;
+    m_surface = surface;
+    m_physicalDevice = physicalDevice;
+
+    createSwapChain();
+    createImageView();
+    createSemaphore(MAX_FRAMES_IN_FLIGHT);
 }
 
-void Swapchain::cleanup(VkDevice device)
+void Swapchain::cleanup() const
 {
     for (int i = 0; i < swapChainFramebuffers.size(); ++i)
     {
-        vkDestroyFramebuffer(device, swapChainFramebuffers[i], nullptr);
+        vkDestroyFramebuffer(m_device, swapChainFramebuffers[i], nullptr);
     }
 
     for (int i = 0; i < swapChainFramebuffers.size(); ++i)
     {
-        vkDestroyImageView(device, swapChainImageViews[i], nullptr);
+        vkDestroyImageView(m_device, swapChainImageViews[i], nullptr);
     }
 
-    vkDestroySwapchainKHR(device, swapChain, nullptr);
+    vkDestroySwapchainKHR(m_device, swapChain, nullptr);
 }
 
-void Swapchain::cleanupSemaphore(VkDevice device)
+void Swapchain::cleanupSemaphore() const
 {
     for (int i = 0; i < imageAvailableSemaphores.size(); ++i)
     {
-        vkDestroySemaphore(device, imageAvailableSemaphores[i], nullptr);
+        vkDestroySemaphore(m_device, imageAvailableSemaphores[i], nullptr);
     }
 }
 
-void Swapchain::recreate(
-    VkPhysicalDevice physicalDevice,
-    VkDevice device,
-    VkSurfaceKHR surface,
-    VkRenderPass renderPass,
-    QueueFamilyIndices indices
-)
+void Swapchain::recreate(VkRenderPass renderPass)
 {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window, &width, &height);
@@ -57,27 +55,21 @@ void Swapchain::recreate(
         glfwWaitEvents();
     }
 
-    vkDeviceWaitIdle(device);
+    vkDeviceWaitIdle(m_device);
 
-    cleanup(device);
+    cleanup();
 
-    createSwapChain(physicalDevice, device, surface, indices);
-    createImageView(device);
-    createFramebuffers(device, renderPass);
+    createSwapChain();
+    createImageView();
+    createFramebuffers(renderPass);
 }
 
-uint32_t Swapchain::currentImage(
-    VkDevice device,
-    VkPhysicalDevice physicalDevice,
-    VkSurfaceKHR surface,
-    VkRenderPass renderPass,
-    uint32_t currentFrame
-)
+uint32_t Swapchain::currentImage(VkRenderPass renderPass, uint32_t currentFrame)
 {
     uint32_t currentImageIndex = 0;
 
     VkResult result = vkAcquireNextImageKHR(
-        device,
+        m_device,
         swapChain,
         UINT64_MAX,
         imageAvailableSemaphores[currentFrame],
@@ -86,7 +78,7 @@ uint32_t Swapchain::currentImage(
     );
     if (result == VK_ERROR_OUT_OF_DATE_KHR)
     {
-        recreate(physicalDevice, device, surface, renderPass, findQueueFamilies(physicalDevice, surface));
+        recreate(renderPass);
         return -1;
     }
     else if (result != VK_SUCCESS)
@@ -97,14 +89,9 @@ uint32_t Swapchain::currentImage(
     return currentImageIndex;
 }
 
-void Swapchain::createSwapChain(
-    VkPhysicalDevice physicalDevice,
-    VkDevice device,
-    VkSurfaceKHR surface,
-    QueueFamilyIndices indices
-)
+void Swapchain::createSwapChain()
 {
-    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(physicalDevice, surface);
+    SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_physicalDevice, m_surface);
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);
@@ -120,7 +107,7 @@ void Swapchain::createSwapChain(
 
     VkSwapchainCreateInfoKHR createInfo = {
         .sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-        .surface = surface,
+        .surface = m_surface,
         .minImageCount = imageCount,
         .imageFormat = surfaceFormat.format,
         .imageColorSpace = surfaceFormat.colorSpace,
@@ -129,6 +116,7 @@ void Swapchain::createSwapChain(
         .imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT, // directly render to the swapchain image
     };
 
+    auto indices = findQueueFamilies(m_physicalDevice, m_surface);
     uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
 
     if (indices.graphicsFamily != indices.presentFamily)
@@ -150,20 +138,20 @@ void Swapchain::createSwapChain(
     createInfo.clipped = VK_TRUE;
     createInfo.oldSwapchain = VK_NULL_HANDLE;
 
-    if (vkCreateSwapchainKHR(device, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
+    if (vkCreateSwapchainKHR(m_device, &createInfo, nullptr, &swapChain) != VK_SUCCESS)
     {
         throw std::runtime_error("failed to create swap chain");
     }
 
-    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, nullptr);
+    vkGetSwapchainImagesKHR(m_device, swapChain, &imageCount, nullptr);
     swapChainImages.resize(imageCount);
-    vkGetSwapchainImagesKHR(device, swapChain, &imageCount, swapChainImages.data());
+    vkGetSwapchainImagesKHR(m_device, swapChain, &imageCount, swapChainImages.data());
 
     swapChainImageFormat = surfaceFormat.format;
     swapChainExtent = extent;
 }
 
-void Swapchain::createImageView(VkDevice device)
+void Swapchain::createImageView()
 {
     swapChainImageViews.resize(swapChainImages.size());
 
@@ -188,14 +176,14 @@ void Swapchain::createImageView(VkDevice device)
             .layerCount = 1,
         };
 
-        if (vkCreateImageView(device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
+        if (vkCreateImageView(m_device, &createInfo, nullptr, &swapChainImageViews[i]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create image views");
         }
     }
 }
 
-void Swapchain::createFramebuffers(VkDevice device, VkRenderPass renderPass)
+void Swapchain::createFramebuffers(VkRenderPass renderPass)
 {
     swapChainFramebuffers.resize(swapChainImageViews.size());
 
@@ -215,14 +203,14 @@ void Swapchain::createFramebuffers(VkDevice device, VkRenderPass renderPass)
             .layers = 1,
         };
 
-        if (vkCreateFramebuffer(device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
+        if (vkCreateFramebuffer(m_device, &framebufferInfo, nullptr, &swapChainFramebuffers[i]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create framebuffer");
         }
     }
 }
 
-void Swapchain::createSemaphore(VkDevice device, uint32_t size)
+void Swapchain::createSemaphore(uint32_t size)
 {
     imageAvailableSemaphores.resize(size);
 
@@ -232,7 +220,7 @@ void Swapchain::createSemaphore(VkDevice device, uint32_t size)
 
     for (size_t i = 0; i < size; i++)
     {
-        if (vkCreateSemaphore(device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS)
+        if (vkCreateSemaphore(m_device, &semaphoreInfo, nullptr, &imageAvailableSemaphores[i]) != VK_SUCCESS)
         {
             throw std::runtime_error("failed to create semaphore");
         }
@@ -265,7 +253,7 @@ VkPresentModeKHR Swapchain::chooseSwapPresentMode(const std::vector<VkPresentMod
     return VK_PRESENT_MODE_FIFO_KHR;
 }
 
-VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities)
+VkExtent2D Swapchain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities) const
 {
     if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max())
     {

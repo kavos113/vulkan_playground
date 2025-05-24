@@ -10,6 +10,7 @@
 #include <set>
 #include <stdexcept>
 
+#include "Command.h"
 #include "debugUtils.h"
 #include "settings.h"
 #include "utils.h"
@@ -37,19 +38,17 @@ void Application::initVulkan()
     createSurface();
     pickPhysicalDevice();
     createLogicalDevice();
-    swapChain.create(physicalDevice, device, surface, findQueueFamilies(physicalDevice, surface));
+    swapChain.create(physicalDevice, device, surface);
     createRenderPass();
     createDescriptorSetLayout();
     createPipeline();
-    swapChain.createFramebuffers(device, renderPass);
-    createCommandPool();
+    swapChain.createFramebuffers(renderPass);
+    command.create(device, physicalDevice, surface);
     createVertexBuffer();
     createIndexBuffer();
     createUniformBuffer();
     createDescriptorPool();
     createDescriptorSets();
-    createCommandBuffer();
-    createSyncObjects();
 }
 
 void Application::mainLoop()
@@ -65,7 +64,7 @@ void Application::mainLoop()
 
 void Application::cleanup()
 {
-    swapChain.cleanup(device);
+    swapChain.cleanup();
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
     {
@@ -87,14 +86,8 @@ void Application::cleanup()
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyRenderPass(device, renderPass, nullptr);
 
-    swapChain.cleanupSemaphore(device);
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        vkDestroySemaphore(device, renderFinishedSemaphores[i], nullptr);
-        vkDestroyFence(device, inFlightFences[i], nullptr);
-    }
-
-    vkDestroyCommandPool(device, commandPool, nullptr);
+    swapChain.cleanupSemaphore();
+    command.claenup();
 
     vkDestroyDevice(device, nullptr);
 
@@ -217,7 +210,7 @@ int Application::rateDeviceSuitability(VkPhysicalDevice device)
         return 0;
     }
 
-    QueueFamilyIndices indices = findQueueFamilies(device, surface);
+    auto indices = findQueueFamilies(device, surface);
     if (!indices.isComplete())
     {
         return 0;
@@ -257,25 +250,9 @@ bool Application::checkDeviceExtensionSupport(VkPhysicalDevice device)
 
 void Application::createLogicalDevice()
 {
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice, surface);
+    auto indices = findQueueFamilies(physicalDevice, surface);
 
-    std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-    std::set uniqueQueueFamilies = {
-        indices.graphicsFamily.value(),
-        indices.presentFamily.value()
-    };
-
-    float queuePriority = 1.0f;
-    for (uint32_t queueFamily : uniqueQueueFamilies)
-    {
-        VkDeviceQueueCreateInfo queueCreateInfo = {
-            .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
-            .queueFamilyIndex = queueFamily,
-            .queueCount = 1,
-            .pQueuePriorities = &queuePriority,
-        };
-        queueCreateInfos.push_back(queueCreateInfo);
-    }
+    auto queueCreateInfos = Command::queueCreateInfo(physicalDevice, surface);
 
     VkPhysicalDeviceFeatures deviceFeatures = {};
 
@@ -300,9 +277,6 @@ void Application::createLogicalDevice()
     {
         throw std::runtime_error("failed to create logical device");
     }
-
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
 }
 
 void Application::createSurface()
@@ -378,7 +352,7 @@ void Application::createPipeline()
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
     rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-    rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
     rasterizer.depthBiasConstantFactor = 0.0f;
     rasterizer.depthBiasClamp = 0.0f;
@@ -514,51 +488,8 @@ void Application::createRenderPass()
     }
 }
 
-void Application::createCommandPool()
-{
-    QueueFamilyIndices queueFamilyIndices = findQueueFamilies(physicalDevice, surface);
-
-    VkCommandPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
-    poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-
-    if (vkCreateCommandPool(device, &poolInfo, nullptr, &commandPool) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to create command pool");
-    }
-}
-
-void Application::createCommandBuffer()
-{
-    commandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
-
-    VkCommandBufferAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = commandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = static_cast<uint32_t>(commandBuffers.size()),
-    };
-
-    if (vkAllocateCommandBuffers(device, &allocInfo, commandBuffers.data()) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate command buffer");
-    }
-}
-
 void Application::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t imageIndex)
 {
-    VkCommandBufferBeginInfo beginInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = 0,
-        .pInheritanceInfo = nullptr,
-    };
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to begin command buffer");
-    }
-
     VkRenderPassBeginInfo renderPassInfo = {};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
     renderPassInfo.renderPass = renderPass;
@@ -606,43 +537,13 @@ void Application::recordCommandBuffer(VkCommandBuffer commandBuffer, uint32_t im
     vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 
     vkCmdEndRenderPass(commandBuffer);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to record command buffer");
-    }
-}
-
-void Application::createSyncObjects()
-{
-    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
-
-    VkSemaphoreCreateInfo semaphoreInfo = {
-        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO,
-    };
-    VkFenceCreateInfo fenceInfo = {
-        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
-        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
-    };
-
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++)
-    {
-        if (
-           vkCreateSemaphore(device, &semaphoreInfo, nullptr, &renderFinishedSemaphores[i]) != VK_SUCCESS ||
-           vkCreateFence(device, &fenceInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS
-       )
-        {
-            throw std::runtime_error("failed to create semaphore or fence");
-        }
-    }
 }
 
 void Application::drawFrame()
 {
-    vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+    command.beginRender(currentFrame);
 
-    uint32_t imageIndex = swapChain.currentImage(device, physicalDevice, surface, renderPass, currentFrame);
+    uint32_t imageIndex = swapChain.currentImage(renderPass, currentFrame);
     if (imageIndex == -1)
     {
         return;
@@ -650,44 +551,24 @@ void Application::drawFrame()
 
     updateUniformBuffer(currentFrame);
 
-    vkResetFences(device, 1, &inFlightFences[currentFrame]);
+    recordCommandBuffer(command.commandBuffer(currentFrame), imageIndex);
 
-    vkResetCommandBuffer(commandBuffers[currentFrame], 0);
-    recordCommandBuffer(commandBuffers[currentFrame], imageIndex);
+    command.endRender(currentFrame, swapChain);
 
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    VkSemaphore waitSemaphores[] = {swapChain.imageAvailableSemaphore(currentFrame)};
-    VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-    submitInfo.waitSemaphoreCount = 1;
-    submitInfo.pWaitSemaphores = waitSemaphores;
-    submitInfo.pWaitDstStageMask = waitStages;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffers[currentFrame];
-    VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
-    submitInfo.signalSemaphoreCount = 1;
-    submitInfo.pSignalSemaphores = signalSemaphores;
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to submit draw command buffer");
-    }
 
-    VkPresentInfoKHR presentInfo = {
-        .sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
-        .waitSemaphoreCount = 1,
-        .pWaitSemaphores = signalSemaphores,
-    };
+    VkPresentInfoKHR presentInfo{};
+    presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
     VkSwapchainKHR swapChains[] = {swapChain.handle()};
     presentInfo.swapchainCount = 1;
     presentInfo.pSwapchains = swapChains;
     presentInfo.pImageIndices = &imageIndex;
     presentInfo.pResults = nullptr;
 
-    VkResult result = vkQueuePresentKHR(presentQueue, &presentInfo);
+    VkResult result = command.present(presentInfo, currentFrame);
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || framebufferResized)
     {
         framebufferResized = false;
-        swapChain.recreate(physicalDevice, device, surface, renderPass, findQueueFamilies(physicalDevice, surface));
+        swapChain.recreate(renderPass);
     }
     else if (result != VK_SUCCESS)
     {
@@ -726,7 +607,7 @@ void Application::createVertexBuffer()
         vertexBuffer,
         vertexBufferMemory
     );
-    copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    command.copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -788,61 +669,6 @@ void Application::createBuffer(
     }
 }
 
-void Application::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
-{
-    VkCommandBufferAllocateInfo allocInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = commandPool,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-
-    VkCommandBuffer commandBuffer;
-    if (vkAllocateCommandBuffers(device, &allocInfo, &commandBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to allocate command buffer");
-    }
-
-    VkCommandBufferBeginInfo beginInfo = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = 0,
-        .pInheritanceInfo = nullptr,
-    };
-
-    if (vkBeginCommandBuffer(commandBuffer, &beginInfo) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to begin command buffer");
-    }
-
-    VkBufferCopy copyRegion = {
-        .srcOffset = 0,
-        .dstOffset = 0,
-        .size = size,
-    };
-    vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to record command buffer");
-    }
-
-    VkSubmitInfo submitInfo{};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
-
-    if (vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to submit command buffer");
-    }
-    if (vkQueueWaitIdle(graphicsQueue) != VK_SUCCESS)
-    {
-        throw std::runtime_error("failed to wait for queue idle");
-    }
-
-    vkFreeCommandBuffers(device, commandPool, 1, &commandBuffer);
-}
-
 void Application::createIndexBuffer()
 {
     VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
@@ -872,7 +698,7 @@ void Application::createIndexBuffer()
         indexBuffer,
         indexBufferMemory
     );
-    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
+    command.copyBuffer(stagingBuffer, indexBuffer, bufferSize);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -948,7 +774,7 @@ void Application::updateUniformBuffer(uint32_t currentImageIndex)
         0.1f, 10.0f
     );
 
-    // ubo.proj[1][1] *= -1; // reverse y coordinate
+    ubo.proj[1][1] *= -1; // reverse y coordinate
 
     memcpy(uniformBuffersMapped[currentImageIndex], &ubo, sizeof(ubo));
 }
